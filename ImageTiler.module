@@ -16,12 +16,12 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
       'singular' 	=> true,
       'autoload' 	=> true,
       'icon'     	=> 'th'
-      );
+    );
   }
 
-	public function init() {
+  public function init() {
 
-	}
+  }
 
   public function ready() {
 
@@ -64,7 +64,7 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
 
   }
 
-	protected function GenerateTilesForImage($image, $refreshTiles = false) {
+  protected function GenerateTilesForImage($image, $refreshTiles = false) {
     $tileFolderPath = $this->GetTileFolderPath($image);
 
     if($refreshTiles == true) {
@@ -74,12 +74,12 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
     $tilerWorker = new MapTiler();
 
     if(is_dir($tileFolderPath)) {
-    	return $tileFolderPath;
+      return $tileFolderPath;
     }
 
     $tileOptions = array(
       "tiles_path" => $tileFolderPath,
-		  "tile_size" => $this->tileSize,
+      "tile_size" => $this->tileSize,
       "store_structure" => $this->storeStructure,
       "tms" => $this->tms,
       "fill_color" => $this->fillColor,
@@ -88,13 +88,13 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
       "scaling_up" => $this->scalingUp,
       "format" => $this->format,
       "quality_jpeg" => $this->qualityJpeg
-		);
+    );
 
     $tilerWorker = new MapTiler($image->filename, $tileOptions);
-		$tilerWorker->process(true);
+    $tilerWorker->process(true);
 
-		return $tileFolderPath;
-	}
+    return $tileFolderPath;
+  }
 
   protected function RemoveTilesForImage($image) {
     $tileFolderPath = $this->GetTileFolderPath($image);
@@ -106,7 +106,7 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
 
   protected function GetTileFolderPath($image) {
     return pathinfo($image->filename, PATHINFO_DIRNAME) . '/' .
-      pathinfo($image->filename, PATHINFO_FILENAME);
+    pathinfo($image->filename, PATHINFO_FILENAME);
   }
 
 }
