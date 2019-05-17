@@ -59,19 +59,33 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
       $refreshTiles = $event->arguments(0);
 
       $path = $this->GenerateTilesForImage($image, $refreshTiles);
-      $event->return = str_replace($_SERVER['DOCUMENT_ROOT'], '', $path);
+      $event->return = $this->GetTileData($path);
+    });
+
+    $this->addHook('Pagefiles::delete', function(HookEvent $event) {
+      $image = $event->arguments(0);
+      $this->RemoveTilesForImage($image);
     });
 
   }
 
-  protected function GenerateTilesForImage($image, $refreshTiles = false) {
+  public function GetTileData($path) {
+    $subDirs = array_filter(glob($path . '/*'), 'is_dir');
+    $subDirs = str_replace($path . '/', '', $subDirs);
+    return array(
+      "folderUrl" => str_replace($_SERVER['DOCUMENT_ROOT'], '', $path),
+      "tileSize" => $this->tileSize,
+      "minZoom" => min($subDirs),
+      "maxZoom" => max($subDirs),
+    );
+  }
+
+  protected function GenerateTilesForImage(Pageimage $image, $refreshTiles = false) {
     $tileFolderPath = $this->GetTileFolderPath($image);
 
     if($refreshTiles == true) {
-      rrmdir($tileFolderPath);
+      $this->RemoveTiles($tileFolderPath);
     }
-
-    $tilerWorker = new MapTiler();
 
     if(is_dir($tileFolderPath)) {
       return $tileFolderPath;
@@ -96,15 +110,19 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
     return $tileFolderPath;
   }
 
-  protected function RemoveTilesForImage($image) {
-    $tileFolderPath = $this->GetTileFolderPath($image);
-    if(is_dir($tileFolderPath)) {
-      rrmdir($tileFolderPath);
-    }
-    return !is_dir($tileFolderPath);
+  protected function RemoveTilesForImage(Pageimage $image) {
+    $path = $this->GetTileFolderPath($image);
+    return $this->RemoveTiles($path);
   }
 
-  protected function GetTileFolderPath($image) {
+  protected function RemoveTiles($path) {
+    if(is_dir($path)) {
+      rrmdir($path);
+    }
+    return !is_dir($path);
+  }
+
+  protected function GetTileFolderPath(Pageimage $image) {
     return pathinfo($image->filename, PATHINFO_DIRNAME) . '/' .
     pathinfo($image->filename, PATHINFO_FILENAME);
   }
