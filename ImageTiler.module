@@ -1,8 +1,6 @@
 <?php namespace ProcessWire;
 
 include "Utils.php";
-include "MapTiler.php";
-use MapTiler;
 
 class ImageTiler extends WireData implements Module, ConfigurableModule  {
 
@@ -10,7 +8,7 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
 
     return array(
       'title' 		=> 'ImageTiler',
-      'version' 	=> '0.0.1',
+      'version' 	=> '0.1',
       'summary' 	=> 'This module splits large images into smaller tiles',
       'href' 			=> 'https://processwire.com',
       'singular' 	=> true,
@@ -27,8 +25,8 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
 
     $this->addHookAfter('InputfieldImage::getFileActions', function(HookEvent $event) {
       $event->return = array(
-        'gentile' => 'Generate Tiles',
-        'reftile' => 'Refresh Tiles',
+        'cretile' => 'Create Tiles',
+        'reltile' => 'Reload Tiles',
         'deltile' => 'Delete Tiles',
         '-' => '-'
       ) + $event->return;
@@ -40,91 +38,77 @@ class ImageTiler extends WireData implements Module, ConfigurableModule  {
       $actionName = $event->arguments[2];
       $path = "";
 
-      if($actionId == 'gentile') {
-        $path = $this->GenerateTilesForImage($image);
+      if($actionId == 'cretile') {
+        $path = $this->CreateTiles($image);
         $event->return = is_dir($path);
-      } else if($actionId == 'reftile') {
-        $path = $this->GenerateTilesForImage($image, true);
-        $event->return = is_dir($path);
+      } else if($actionId == 'reltile') {
+		$removed = $this->RemoveTiles($image);
+        $path = $this->CreateTiles($image);
+        $event->return = $removed && is_dir($path);
       } else if($actionId == 'deltile') {
-        $event->return = $this->RemoveTilesForImage($image);
+        $event->return = $this->RemoveTiles($image);
       } else if($actionId == '-') { // just a spacer
         $event->return = false;
       }
     });
-
-    //Frontend $image->tile($refresh);
+	
+	//Frontend $image->tile($create);
     $this->addHook('Pageimage::tile', function(HookEvent $event) {
       $image = $event->object;
-      $refreshTiles = $event->arguments(0);
-
-      $path = $this->GenerateTilesForImage($image, $refreshTiles);
-      $event->return = $this->GetTileData($path);
+      $create = $event->arguments(0);
+      if($create || is_dir($this->GetTilePath($image))) {
+        $path = $this->CreateTiles($image);
+        $event->return = $this->GetTileData($image, $path);
+      } else {
+        $event->return = [];
+      }
     });
 
-    $this->addHook('Pagefiles::delete', function(HookEvent $event) {
+    $this->addHook('Pageimages::delete', function(HookEvent $event) {
       $image = $event->arguments(0);
-      $this->RemoveTilesForImage($image);
+      $this->RemoveTiles($image);
     });
 
   }
 
-  public function GetTileData($path) {
-    $subDirs = array_filter(glob($path . '/*'), 'is_dir');
-    $subDirs = str_replace($path . '/', '', $subDirs);
-    return array(
-      "folderUrl" => str_replace($_SERVER['DOCUMENT_ROOT'], '', $path),
-      "tileSize" => $this->tileSize,
-      "minZoom" => min($subDirs),
-      "maxZoom" => max($subDirs),
-    );
-  }
+  protected function CreateTiles(Pageimage $image) {
+    $destination = $this->GetTilePath($image);
 
-  protected function GenerateTilesForImage(Pageimage $image, $refreshTiles = false) {
-    $tileFolderPath = $this->GetTileFolderPath($image);
-
-    if($refreshTiles == true) {
-      $this->RemoveTiles($tileFolderPath);
+    if(is_dir($destination)) {
+      return $destination;
     }
 
-    if(is_dir($tileFolderPath)) {
-      return $tileFolderPath;
-    }
+    tileImage($image->filename, $destination, $this->format, $this->quality, $this->tileSize, $this->fillColor);
 
-    $tileOptions = array(
-      "tiles_path" => $tileFolderPath,
-      "tile_size" => $this->tileSize,
-      "store_structure" => $this->storeStructure,
-      "tms" => $this->tms,
-      "fill_color" => $this->fillColor,
-      "zoom_min" => $this->zoomMin,
-      "zoom_max" => $this->zoomMax,
-      "scaling_up" => $this->scalingUp,
-      "format" => $this->format,
-      "quality_jpeg" => $this->qualityJpeg
-    );
-
-    $tilerWorker = new MapTiler($image->filename, $tileOptions);
-    $tilerWorker->process(true);
-
-    return $tileFolderPath;
+    return $destination;
   }
 
-  protected function RemoveTilesForImage(Pageimage $image) {
-    $path = $this->GetTileFolderPath($image);
-    return $this->RemoveTiles($path);
-  }
+  protected function RemoveTiles(Pageimage $image) {
+    $path = $this->GetTilePath($image);
 
-  protected function RemoveTiles($path) {
-    if(is_dir($path)) {
+	if(is_dir($path)) {
       rrmdir($path);
     }
     return !is_dir($path);
   }
 
-  protected function GetTileFolderPath(Pageimage $image) {
+  protected function GetTilePath($image) {
     return pathinfo($image->filename, PATHINFO_DIRNAME) . '/' .
     pathinfo($image->filename, PATHINFO_FILENAME);
+  }
+  
+  public function GetTileData(Pageimage $image, $path) {
+    $subDirs = array_filter(glob($path . '/*'), 'is_dir');
+    $subDirs = str_replace($path . '/', '', $subDirs);
+    return array(
+      "url" => str_replace($_SERVER['DOCUMENT_ROOT'], '', $path),
+      "tileSize" => $this->tileSize,
+      "minZoom" => !empty($subDirs) ? min($subDirs) : '',
+      "maxZoom" => !empty($subDirs) ? max($subDirs) : '',
+      "imageWidth" => $image->width,
+      "imageHeight" => $image->height,
+      "imageExt" => pathinfo($image->filename, PATHINFO_EXTENSION)
+    );
   }
 
 }
