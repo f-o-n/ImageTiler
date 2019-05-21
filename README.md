@@ -9,7 +9,7 @@ This module's files should be placed in /site/modules/ImageTiler/
 ## Example usage with Leaflet
 
 [Download](https://leafletjs.com/download.html) and add Leaflet to your project.
-The data object is a Json object returned from the call to $image->tile.
+The data object is the object returned from the call to $image->tile()
 
 ```javascript
 var map = L.map('map', {
@@ -19,8 +19,8 @@ var map = L.map('map', {
     attributionControl: false
 });
 
-var sw = zoom.map.unproject([0, data.imageHeight], data.maxZoom);
-var ne = zoom.map.unproject([data.imageWidth, 0], data.maxZoom);
+var sw = map.unproject([0, data.imageHeight], data.maxZoom);
+var ne = map.unproject([data.imageWidth, 0], data.maxZoom);
 var bounds = new L.LatLngBounds(sw, ne);
 
 var layer = L.tileLayer(data.url + '/{z}/{x}/{y}.jpg', {
